@@ -14,7 +14,6 @@
 
     <dependencies>
 
-        <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
@@ -26,14 +25,12 @@
             <version>1.4.11</version>
         </dependency>
 
-        <!-- Optional: JSON Processing (for task metadata) -->
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>2.10.1</version>
         </dependency>
 
-        <!-- Optional: Better file/stream utilities -->
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>

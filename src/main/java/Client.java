@@ -1,104 +1,54 @@
-import java.io.*;
-import java.net.ServerSocket;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 public class Client {
+    private static final int DEFAULT_PORT = 4331;
 
     public static void main(String[] args) {
-        int port = 4331;  // Change to your required port number
-
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println("Server is listening on port " + port);
-
-            while (true) {
-                try (Socket socket = serverSocket.accept()) {
-                    System.out.println("Client connected");
-
-                    // Receive the file from the client
-                    File receivedFile = receiveFile(socket);
-
-                    // Process the Python file and return the result
-                    String result = executePythonScript(receivedFile.getAbsolutePath());
-
-                    // Send the result back to the client
-                    sendResultToClient(socket, result);
-
-                    // Delete the temporary file after processing and sending the response
-                    if (receivedFile.delete()) {
-                        System.out.println("Temporary file deleted successfully: " + receivedFile.getName());
-                    } else {
-                        System.out.println("Failed to delete the temporary file: " + receivedFile.getName());
-                    }
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (args.length < 2) {
+            System.out.println("Usage: java Client <host> <script-path> [port]");
+            return;
         }
-    }
 
-    private static File receiveFile(Socket socket) throws IOException {
-        InputStream inputStream = socket.getInputStream();
-        DataInputStream dataInputStream = new DataInputStream(inputStream);
+        String host = args[0];
+        Path scriptPath = Path.of(args[1]);
+        int port = args.length >= 3 ? Integer.parseInt(args[2]) : DEFAULT_PORT;
 
-        // Reading the filename
-        String fileName = dataInputStream.readUTF();
-        System.out.println("Receiving file: " + fileName);
-
-        // Saving the received Python file as a temporary file with a unique name
-        File file = new File("received_" + System.currentTimeMillis() + "_" + fileName);
-        try (FileOutputStream fileOutputStream = new FileOutputStream(file)) {
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-            while ((bytesRead = dataInputStream.read(buffer)) != -1) {
-                fileOutputStream.write(buffer, 0, bytesRead);
-                // Break if the buffer is smaller than expected, indicating end of file
-                if (bytesRead < buffer.length) break;
-            }
+        if (!Files.exists(scriptPath)) {
+            System.err.println("Script file does not exist: " + scriptPath);
+            return;
         }
-        System.out.println("File received successfully: " + file.getName());
-        return file;  // Return the received file for further processing
-    }
 
-    private static String executePythonScript(String filePath) {
-        StringBuilder output = new StringBuilder();
         try {
-            // Running the Python script using system's Python3
-            ProcessBuilder processBuilder = new ProcessBuilder("python", filePath);
-            processBuilder.redirectErrorStream(true); // Merge stdout and stderr
-            Process process = processBuilder.start();
-
-            // Reading the output from the executed Python script
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                output.append(line).append("\n");
+            Protocol.Response response = sendScript(host, port, scriptPath);
+            if (response.isSuccess()) {
+                System.out.println("Script executed successfully.");
+            } else {
+                System.out.println("Script execution failed. exitCode=" + response.getExitCode());
             }
-
-            // Wait for the process to complete
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                output.append("Error: Python script exited with code ").append(exitCode).append("\n");
-            }
-
-        } catch (Exception e) {
-            output.append("Failed to execute script: ").append(e.getMessage());
+            System.out.println("--- Script Output ---");
+            System.out.print(response.getOutput());
+        } catch (IOException e) {
+            System.err.println("Client error: " + e.getMessage());
         }
-
-        return output.toString();
     }
 
-    private static void sendResultToClient(Socket socket, String result) throws IOException {
-        OutputStream outputStream = socket.getOutputStream();
-        DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+    private static Protocol.Response sendScript(String host, int port, Path scriptPath) throws IOException {
+        byte[] scriptContent = Files.readAllBytes(scriptPath);
+        if (scriptContent.length > Protocol.MAX_SCRIPT_SIZE_BYTES) {
+            throw new IOException("Script file exceeds max allowed size of " + Protocol.MAX_SCRIPT_SIZE_BYTES + " bytes");
+        }
 
-        // Send the result length to client first
-        dataOutputStream.writeInt(result.length());
-        dataOutputStream.flush();
+        try (Socket socket = new Socket(host, port);
+             DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+             DataInputStream inputStream = new DataInputStream(socket.getInputStream())) {
 
-        // Send the result content
-        dataOutputStream.writeUTF(result);
-        dataOutputStream.flush();
-
-        System.out.println("Result sent to client.");
+            Protocol.writeRequest(outputStream, scriptPath.getFileName().toString(), scriptContent);
+            return Protocol.readResponse(inputStream);
+        }
     }
 }

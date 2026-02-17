@@ -1,46 +1,66 @@
-# Distributed Processing
+# Distributive Streams
 
-## Overview
+A lightweight distributed execution system where:
+- the **Client** uploads a Python script,
+- the **Server** runs it in an isolated temporary file,
+- and the execution output is returned to the client.
 
-This project implements a simple distributed processing system where a client can upload scripts to a server. The server executes the scripts and sends the results back to the client. Utilizing Java's socket programming for communication, this project demonstrates an effective way to distribute processing tasks across different devices.
+## What was improved
 
-## Importance of the Project
+- Fixed architecture by implementing a true client (the old client duplicated server behavior).
+- Added a clear binary protocol with size checks for safer file transfer.
+- Added concurrent request handling on the server with a worker thread pool.
+- Added process timeout support to prevent hung scripts.
+- Added filename sanitization and strict upload size limits.
+- Added unit tests for protocol behavior and data validation.
 
-1. **Distributed Computing**: As applications become more complex, distributing processing tasks can lead to increased efficiency. This project serves as a foundational model for more extensive systems, enabling users to offload tasks to a dedicated server.
+## Requirements
 
-2. **Real-Time Data Processing**: By allowing the client to send scripts for execution, this setup facilitates real-time data analysis and processing, which is crucial in various fields such as data science, machine learning, and web development.
+- Java 11+
+- Maven 3.8+
+- Python runtime available as `python3` (or set `PYTHON_CMD` env var)
 
-3. **Resource Optimization**: Users can leverage more powerful server resources to execute intensive computations while keeping their local machines free for other tasks.
+## Build
 
-4. **Educational Tool**: This project serves as an excellent educational resource for understanding socket programming, client-server architecture, and inter-process communication.
+```bash
+mvn clean package
+```
 
-## Applications
+## Run
 
-This distributed processing model can be applied in various domains, including but not limited to:
+### Start server
 
-- **Data Analysis**: Users can run data processing scripts on large datasets stored on a server without needing to transfer the entire dataset.
-- **Machine Learning**: Machine learning algorithms can be executed on the server, leveraging its resources while clients send in new data for prediction.
-- **Web Services**: Integration with web applications to allow users to run scripts or commands dynamically based on user input.
-- **Testing and Automation**: Automating the execution of test scripts or deployment scripts from a central server.
+```bash
+java -cp target/distributive-streams-1.1.0.jar Server 4331
+```
 
-## Execution
+`4331` is optional; default port is `4331`.
 
-### Prerequisites
+### Run client
 
-- Java Development Kit (JDK) installed on your machine.
-- Basic knowledge of Java.
+```bash
+java -cp target/distributive-streams-1.1.0.jar Client localhost path/to/script.py 4331
+```
 
-### Setting Up the Project
+Arguments:
+1. `host`
+2. `script-path`
+3. optional `port` (defaults to `4331`)
 
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/yourusername/DistributedProcessing.git
-   cd DistributedProcessing
-   
-2. **Server Side Agent**:
-   ```bash
-   java FileServer.java
-  
-3. **Client Side Agent**:
-   ```bash
-   java FileClient.java
+## Protocol details
+
+Client request:
+1. `UTF` filename
+2. `int` script length
+3. script bytes
+
+Server response:
+1. `boolean` success
+2. `int` exit code
+3. `UTF` output
+
+## Test
+
+```bash
+mvn test
+```

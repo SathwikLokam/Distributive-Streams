@@ -5,6 +5,12 @@ A lightweight distributed execution system where:
 - the **Server** runs it in an isolated temporary file,
 - and the execution output is returned to the client.
 
+## Why this project
+
+This project is built around a simple idea: use idle hardware that already exists on your network instead of renting cloud machines.
+
+If one system is mostly idle, it can run jobs submitted by another system acting as a client. That lets you distribute processing and model-training tasks across available machines, reducing cost while making better use of local resources.
+
 ## What was improved
 
 - Fixed architecture by implementing a true client (the old client duplicated server behavior).
